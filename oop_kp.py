@@ -8,6 +8,7 @@ from datetime import date
 from dataclasses import dataclass
 from typing import List, Optional
 
+TEST_CSV_FILE = "ТЕСТ_Студенты_и_стипендии.csv"
 CSV_FILE = "Студенты_и_стипендии.csv"
 BANK_SPRAV = {"044525974": "Сбербанк", "044525225": "ВТБ"}
 FACULTIES = {
@@ -55,6 +56,31 @@ class Scholarship:
     status: str = "назначена"
 
 class FileHandler:
+    @staticmethod
+    def init_test_csv():
+        if not os.path.exists(TEST_CSV_FILE):
+            with open(TEST_CSV_FILE, "w", encoding="utf-8-sig", newline="") as f:
+                writer = csv.writer(f, delimiter=";")
+                writer.writerow([
+                    "ID", "Фамилия", "Имя", "Отчество", "Факультет", "Группа",
+                    "Средний балл", "Соц.статус", "Семестр", "БИК банка", "Счет"
+                ])
+                test_data = [
+                    [1, "Иванов", "Алексей", "Сергеевич", "ИИМРТ", "ИВТ-21", "4,75", "low_income", "", "044525974", "1111111111"],
+                    [2, "Петрова", "Анна", "Владимировна", "ИИМРТ", "ИВТ-22", "5,00", "orphan", "", "044525974", "2222222222"],
+                    [3, "Смирнов", "Дмитрий", "Андреевич", "ИИМРТ", "ПМИ-21", "3,90", "", "", "044525225", "3333333333"],
+                    [4, "Козлова", "Елена", "Игоревна", "ИПЧ", "ПСИ-31", "4,50", "на рассмотрении", "", "044525974", "4444444444"],
+                    [5, "Волков", "Иван", "Павлович", "ИПЧ", "БИО-41", "4,85", "disabled", "", "044525225", "5555555555"],
+                    [6, "Морозова", "Мария", "Николаевна", "ИИМРТ", "ИВТ-31", "4,20", "", "", "044525974", "6666666666"],
+                    [7, "Лебедев", "Артём", "Михайлович", "ИПЧ", "ХИМ-31", "3,75", "", "", "044525225", "7777777777"],
+                    [8, "Новикова", "Софья", "Дмитриевна", "ИИМРТ", "ИВТ-21", "4,95", "low_income", "", "044525974", "8888888888"],
+                    [9, "Федоров", "Максим", "Сергеевич", "ИПЧ", "ПСИ-41", "5,00", "", "осень 2025", "044525225", "9999999999"],
+                    [10, "Гусев", "Андрей", "Викторович", "ИИМРТ", "ПМИ-21", "4,60", "на рассмотрении", "", "044525974", "1010101010"],
+                    [11, "Соколова", "Виктория", "Алексеевна", "ИПЧ", "БИО-41", "4,30", "orphan", "осень 2025", "044525225", "1212121212"]
+                ]
+                writer.writerows(test_data)
+
+
     @staticmethod
     def init_csv():
         if not os.path.exists(CSV_FILE):
@@ -113,6 +139,21 @@ class FileHandler:
         return students
 
 class ScholarshipRegistry:
+    def load_from_students(self, students: List[Student]):
+        for s in students:
+            if s.semester:
+                amount, type_stip = StipendCalculator.calculate(s.avg_grade, s.social_status)
+                if amount > 0:
+                    sch = Scholarship(
+                        student_id=s.id,
+                        type=type_stip,
+                        period=s.semester,
+                        amount=amount,
+                        assigned_at=date.today(),
+                    )
+                    self.assignments.append(sch)
+
+
     def __init__(self):
         self.assignments: List[Scholarship] = []
 
@@ -155,6 +196,7 @@ class StipendCalculator:
 
 class StipendSystem:
     def __init__(self):
+        self.use_test_data = False
         self.role = None
         self.name = None
         self.file_handler = FileHandler()
@@ -511,6 +553,9 @@ class StipendSystem:
 
     def assign_stipend(self):
         students = self.file_handler.load_students()
+
+        self.registry.load_from_students(students)
+
         if not students:
             print("Список пуст")
             input("[Enter]")
@@ -731,6 +776,7 @@ class StipendSystem:
                     print("2. Добавить пользователя")
                     print("3. Редактировать пользователя")
                     print("7. Удалить пользователя")
+                print("8. Использовать тестовую базу студентов" + (" (уже выбрана)" if self.use_test_data else ""))
                 print("9. Выйти из аккаунта")
                 ch = input("\n-> ").strip()
                 if ch == "1": self.view_students()
@@ -746,9 +792,17 @@ class StipendSystem:
                 elif ch == "2" and self.role == "Администратор": self.add_user()
                 elif ch == "3" and self.role == "Администратор": self.edit_user()
                 elif ch == "7" and self.role == "Администратор": self.delete_user()
+                elif ch == "8":
+                    self.use_test_data = True
+                    global CSV_FILE
+                    CSV_FILE = TEST_CSV_FILE
+                    print("\nТестовая база студентов активирована!")
+                    input("[Enter]")
+
                 elif ch == "9": self.role = self.name = None
                 else:
                     print("Недоступная команда для этой роли.")
 
 if __name__ == "__main__":
+    FileHandler.init_test_csv()
     StipendSystem().run()
